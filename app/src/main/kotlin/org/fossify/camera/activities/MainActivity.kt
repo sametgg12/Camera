@@ -711,6 +711,12 @@ class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, Camera
         }
     }
 
+    override fun onZoomLabelChanged(label: String) {
+        if (binding.lensToggle.isVisible()) {
+            binding.lensToggle.text = label
+        }
+    }
+
     override fun setFlashAvailable(available: Boolean) {
         if (available) {
             binding.layoutTop.toggleFlash.beVisible()
