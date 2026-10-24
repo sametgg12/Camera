@@ -50,5 +50,10 @@
     <string name="video_format_hevc">HEVC (H.265)</string>
     <string name="hevc_not_supported">Bu cihaz HEVC\'yi desteklemiyor, otomatik biçim kullanılıyor</string>
     <string name="remember_lens">Son kullanılan lensi hatırla</string>
+    <string name="grid_lines">Kılavuz çizgileri</string>
+    <string name="grid_off">Kapalı</string>
+    <string name="grid_3x3">3 x 3</string>
+    <string name="grid_4x4">4 x 4</string>
+    <string name="swipe_to_switch_camera">Ön/arka kamerayı yukarı veya aşağı kaydırarak değiştir</string>
     <string name="max_brightness">Önizlemede en yüksek ekran parlaklığı</string>
 </resources>
