@@ -50,6 +50,8 @@ class SettingsActivity : SimpleActivity() {
         setupCaptureMode()
         setupVideoFormat()
         setupRememberLens()
+        setupGridLines()
+        setupSwipeCamera()
         updateTextColors(binding.settingsHolder)
 
         val properPrimaryColor = getProperPrimaryColor()
@@ -313,6 +315,40 @@ class SettingsActivity : SimpleActivity() {
         settingsRememberLensHolder.setOnClickListener {
             settingsRememberLens.toggle()
             config.rememberLens = settingsRememberLens.isChecked
+        }
+    }
+
+    private fun setupGridLines() {
+        updateGridLines(config.gridMode)
+        binding.settingsGridHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(0, getString(R.string.grid_off)),
+                RadioItem(3, getString(R.string.grid_3x3)),
+                RadioItem(4, getString(R.string.grid_4x4))
+            )
+
+            RadioGroupDialog(this@SettingsActivity, items, config.gridMode) {
+                config.gridMode = it as Int
+                updateGridLines(it)
+            }
+        }
+    }
+
+    private fun updateGridLines(mode: Int) {
+        binding.settingsGrid.text = getString(
+            when (mode) {
+                3 -> R.string.grid_3x3
+                4 -> R.string.grid_4x4
+                else -> R.string.grid_off
+            }
+        )
+    }
+
+    private fun setupSwipeCamera() = binding.apply {
+        settingsSwipeCamera.isChecked = config.swipeToSwitchCamera
+        settingsSwipeCameraHolder.setOnClickListener {
+            settingsSwipeCamera.toggle()
+            config.swipeToSwitchCamera = settingsSwipeCamera.isChecked
         }
     }
 }
