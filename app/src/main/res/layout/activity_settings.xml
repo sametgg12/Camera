@@ -182,6 +182,20 @@
                         android:text="@string/max_brightness" />
 
                 </RelativeLayout>
+                <RelativeLayout
+                    android:id="@+id/settings_remember_lens_holder"
+                    style="@style/SettingsHolderCheckboxStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <org.fossify.commons.views.MyMaterialSwitch
+                        android:id="@+id/settings_remember_lens"
+                        style="@style/SettingsSwitchStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/remember_lens" />
+
+                </RelativeLayout>
             </LinearLayout>
 
             <include
@@ -312,6 +326,29 @@
                         android:layout_height="wrap_content"
                         android:layout_below="@+id/settings_capture_mode_label"
                         tools:text="@string/minimize_latency" />
+
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/settings_video_format_holder"
+                    style="@style/SettingsHolderTextViewStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/settings_video_format_label"
+                        style="@style/SettingsTextLabelStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/video_format" />
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/settings_video_format"
+                        style="@style/SettingsTextValueStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@+id/settings_video_format_label"
+                        tools:text="@string/video_format_auto" />
 
                 </RelativeLayout>
             </LinearLayout>
