@@ -34,6 +34,7 @@ import org.fossify.camera.extensions.setShadowIcon
 import org.fossify.camera.extensions.toFlashModeId
 import org.fossify.camera.helpers.*
 import org.fossify.camera.implementations.CameraXInitializer
+import org.fossify.camera.implementations.CameraXPreview
 import org.fossify.camera.implementations.CameraXPreviewListener
 import org.fossify.camera.interfaces.MyPreview
 import org.fossify.camera.models.ResolutionOption
@@ -383,6 +384,10 @@ class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, Camera
             mPreview!!.toggleFrontBackCamera()
         }
 
+        lensToggle.setOnClickListener {
+            (mPreview as? CameraXPreview)?.cycleBackLens()
+        }
+
         lastPhotoVideoPreview.setOnClickListener { showLastMediaPreview() }
 
         layoutTop.apply {
@@ -695,6 +700,17 @@ class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, Camera
         binding.toggleCamera.beVisibleIf(hasFrontAndBack)
     }
 
+    override fun onLensesChanged(labels: List<String>, selectedIndex: Int) {
+        binding.lensToggle.apply {
+            if (labels.size > 1) {
+                text = labels.getOrNull(selectedIndex) ?: labels.first()
+                beVisible()
+            } else {
+                beGone()
+            }
+        }
+    }
+
     override fun setFlashAvailable(available: Boolean) {
         if (available) {
             binding.layoutTop.toggleFlash.beVisible()
@@ -718,6 +734,7 @@ class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, Camera
             previewView.isEnabled = enabled
             layoutTop.changeResolution.isEnabled = enabled
             toggleCamera.isClickable = enabled
+            lensToggle.isClickable = enabled
             layoutTop.toggleFlash.isClickable = enabled
         }
     }
