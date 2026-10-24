@@ -57,6 +57,11 @@
     <string name="video_format_hevc">HEVC (H.265)</string>
     <string name="hevc_not_supported">HEVC is not supported on this device, using automatic format</string>
     <string name="remember_lens">Remember the last used lens</string>
+    <string name="grid_lines">Grid lines</string>
+    <string name="grid_off">Off</string>
+    <string name="grid_3x3">3 x 3</string>
+    <string name="grid_4x4">4 x 4</string>
+    <string name="swipe_to_switch_camera">Swipe up or down to switch front/back camera</string>
     <string name="max_brightness">Max screen brightness in preview</string>
     <!--
         Haven't found some strings? There's more at
