@@ -76,6 +76,7 @@ import org.fossify.camera.extensions.toCameraXQuality
 import org.fossify.camera.extensions.toLensFacing
 import org.fossify.camera.helpers.BitmapUtils
 import org.fossify.camera.helpers.CameraErrorHandler
+import org.fossify.camera.helpers.Config
 import org.fossify.camera.helpers.FLASH_ALWAYS_ON
 import org.fossify.camera.helpers.FLASH_ON
 import org.fossify.camera.helpers.ImageQualityManager
@@ -125,6 +126,7 @@ class CameraXPreview(
         // How much the user has to pinch in at minimum zoom before we switch to a wider lens.
         private const val LENS_SWITCH_PINCH_THRESHOLD = 0.9f
         private const val ZOOM_EPSILON = 0.01f
+        private const val MIME_HEVC = "video/hevc"
     }
 
     private val config = activity.config
@@ -188,6 +190,7 @@ class CameraXPreview(
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
+    private var hevcUnsupported = false
     private var camera: Camera? = null
     private var currentRecording: Recording? = null
     private var recordingState: VideoRecordEvent? = null
@@ -222,6 +225,14 @@ class CameraXPreview(
                 bindCameraUseCases()
                 setupCameraObservers()
             } catch (e: Exception) {
+                if (e is IllegalArgumentException && !isPhotoCapture && !hevcUnsupported &&
+                    config.videoFormat == Config.VIDEO_FORMAT_HEVC
+                ) {
+                    hevcUnsupported = true
+                    activity.toast(R.string.hevc_not_supported)
+                    startCamera(switching)
+                    return@addListener
+                }
                 lensSwitchInProgress = false
                 val errorMessage =
                     if (switching) R.string.camera_switch_error else R.string.camera_open_error
@@ -353,9 +364,11 @@ class CameraXPreview(
             FallbackStrategy.higherQualityOrLowerThan(Quality.SD),
         )
 
-        val recorder = Recorder.Builder()
-            .setQualitySelector(qualitySelector)
-            .build()
+        val recorderBuilder = Recorder.Builder().setQualitySelector(qualitySelector)
+        if (config.videoFormat == Config.VIDEO_FORMAT_HEVC && !hevcUnsupported) {
+            recorderBuilder.setVideoMimeType(MIME_HEVC)
+        }
+        val recorder = recorderBuilder.build()
 
         return VideoCapture.withOutput(recorder)
     }
@@ -600,6 +613,9 @@ class CameraXPreview(
             backLenses = lenses.map { (id, displayRatio, _) ->
                 BackLens(id, formatZoomLabel(displayRatio), displayRatio)
             }
+            if (selectedLensId == null && config.rememberLens) {
+                selectedLensId = config.lastBackLensId.ifEmpty { null }
+            }
             if (backLenses.none { it.cameraId == selectedLensId }) {
                 selectedLensId = mainId
             }
@@ -649,6 +665,7 @@ class CameraXPreview(
     private fun switchToLens(lens: BackLens) {
         lensSwitchInProgress = true
         selectedLensId = lens.cameraId
+        config.lastBackLensId = lens.cameraId
         startCamera(switching = true)
     }
 
