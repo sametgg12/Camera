@@ -7,6 +7,7 @@ import org.fossify.camera.R
 import org.fossify.camera.databinding.ActivitySettingsBinding
 import org.fossify.camera.extensions.checkLocationPermission
 import org.fossify.camera.extensions.config
+import org.fossify.camera.helpers.Config
 import org.fossify.camera.models.CaptureMode
 import org.fossify.commons.dialogs.*
 import org.fossify.commons.extensions.*
@@ -47,6 +48,8 @@ class SettingsActivity : SimpleActivity() {
         setupSavePhotosFolder()
         setupPhotoQuality()
         setupCaptureMode()
+        setupVideoFormat()
+        setupRememberLens()
         updateTextColors(binding.settingsHolder)
 
         val properPrimaryColor = getProperPrimaryColor()
@@ -282,5 +285,34 @@ class SettingsActivity : SimpleActivity() {
 
     private fun updateCaptureMode(captureMode: CaptureMode) {
         binding.settingsCaptureMode.text = getString(captureMode.stringResId)
+    }
+
+    private fun setupVideoFormat() {
+        updateVideoFormat(config.videoFormat)
+        binding.settingsVideoFormatHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(Config.VIDEO_FORMAT_AUTO, getString(R.string.video_format_auto)),
+                RadioItem(Config.VIDEO_FORMAT_HEVC, getString(R.string.video_format_hevc))
+            )
+
+            RadioGroupDialog(this@SettingsActivity, items, config.videoFormat) {
+                config.videoFormat = it as Int
+                updateVideoFormat(it)
+            }
+        }
+    }
+
+    private fun updateVideoFormat(format: Int) {
+        binding.settingsVideoFormat.text = getString(
+            if (format == Config.VIDEO_FORMAT_HEVC) R.string.video_format_hevc else R.string.video_format_auto
+        )
+    }
+
+    private fun setupRememberLens() = binding.apply {
+        settingsRememberLens.isChecked = config.rememberLens
+        settingsRememberLensHolder.setOnClickListener {
+            settingsRememberLens.toggle()
+            config.rememberLens = settingsRememberLens.isChecked
+        }
     }
 }
