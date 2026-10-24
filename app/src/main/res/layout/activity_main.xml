@@ -99,6 +99,26 @@
     </RelativeLayout>
 
     <TextView
+        android:id="@+id/lens_toggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/medium_margin"
+        android:background="@drawable/camera_button_background"
+        android:gravity="center"
+        android:minWidth="@dimen/icon_size"
+        android:minHeight="@dimen/icon_size"
+        android:paddingStart="@dimen/medium_margin"
+        android:paddingEnd="@dimen/medium_margin"
+        android:textColor="@android:color/white"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/camera_mode_holder"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:text="0.5x"
+        tools:visibility="visible" />
+
+    <TextView
         android:id="@+id/video_rec_curr_timer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
