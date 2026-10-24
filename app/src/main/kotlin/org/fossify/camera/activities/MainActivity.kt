@@ -121,6 +121,12 @@ class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, Camera
 
     override fun onResume() {
         super.onResume()
+        binding.gridOverlay.apply {
+            if (config.gridMode > 0) {
+                divisions = config.gridMode
+            }
+            beVisibleIf(config.gridMode > 0)
+        }
         if (hasStorageAndCameraPermissions()) {
             val isInPhotoMode = isInPhotoMode()
             setupPreviewImage(isInPhotoMode)
