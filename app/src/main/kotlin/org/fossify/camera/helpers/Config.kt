@@ -11,6 +11,9 @@ import java.io.File
 class Config(context: Context) : BaseConfig(context) {
     companion object {
         fun newInstance(context: Context) = Config(context)
+
+        const val VIDEO_FORMAT_AUTO = 0
+        const val VIDEO_FORMAT_HEVC = 1
     }
 
     var savePhotosFolder: String
@@ -102,5 +105,17 @@ class Config(context: Context) : BaseConfig(context) {
         get() = TimerMode.values().getOrNull(prefs.getInt(TIMER_MODE, TimerMode.OFF.ordinal))
             ?: TimerMode.OFF
         set(timerMode) = prefs.edit().putInt(TIMER_MODE, timerMode.ordinal).apply()
+
+    var videoFormat: Int
+        get() = prefs.getInt("video_format", VIDEO_FORMAT_AUTO)
+        set(videoFormat) = prefs.edit().putInt("video_format", videoFormat).apply()
+
+    var rememberLens: Boolean
+        get() = prefs.getBoolean("remember_lens", true)
+        set(rememberLens) = prefs.edit().putBoolean("remember_lens", rememberLens).apply()
+
+    var lastBackLensId: String
+        get() = prefs.getString("last_back_lens_id", "") ?: ""
+        set(id) = prefs.edit().putString("last_back_lens_id", id).apply()
 
 }
