@@ -127,6 +127,8 @@ class CameraXPreview(
         private const val LENS_SWITCH_PINCH_THRESHOLD = 0.9f
         private const val ZOOM_EPSILON = 0.01f
         private const val MIME_HEVC = "video/hevc"
+        private const val SWIPE_MIN_DISTANCE_DP = 120f
+        private const val SWIPE_MIN_VELOCITY = 800f
     }
 
     private val config = activity.config
@@ -434,6 +436,28 @@ class CameraXPreview(
             override fun onDown(event: MotionEvent): Boolean {
                 listener.onTouchPreview()
                 return super.onDown(event)
+            }
+
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float,
+            ): Boolean {
+                if (!config.swipeToSwitchCamera || e1 == null || scaleGesture?.isInProgress == true ||
+                    e2.pointerCount > 1 || isRecordingNow() || lensSwitchInProgress ||
+                    !hasFrontCamera() || !hasBackCamera()
+                ) {
+                    return false
+                }
+                val dx = e2.x - e1.x
+                val dy = e2.y - e1.y
+                val minDistance = SWIPE_MIN_DISTANCE_DP * activity.resources.displayMetrics.density
+                if (abs(dy) > minDistance && abs(dy) > abs(dx) * 2 && abs(velocityY) > SWIPE_MIN_VELOCITY) {
+                    toggleFrontBackCamera()
+                    return true
+                }
+                return false
             }
 
             override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
