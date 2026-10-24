@@ -2,6 +2,7 @@ package org.fossify.camera.implementations
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.SensorManager
 import android.hardware.display.DisplayManager
 import android.os.Handler
@@ -15,7 +16,11 @@ import android.view.MotionEvent
 import android.view.OrientationEventListener
 import android.view.ScaleGestureDetector
 import android.view.Surface
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
 import androidx.camera.core.DisplayOrientedMeteringPointFactory
@@ -91,7 +96,10 @@ import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.PERMISSION_ACCESS_FINE_LOCATION
 import org.fossify.commons.helpers.ensureBackgroundThread
+import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 class CameraXPreview(
     private val activity: BaseSimpleActivity,
@@ -109,6 +117,11 @@ class CameraXPreview(
         private const val AF_SIZE = 1.0f / 6.0f
         private const val AE_SIZE = AF_SIZE * 1.5f
         private const val CAMERA_MODE_SWITCH_WAIT_TIME = 500L
+
+        // Diagonal of a full frame (35mm) sensor, used to compare focal lengths of different lenses.
+        private const val FULL_FRAME_DIAGONAL_MM = 43.27f
+        private const val WIDE_LENS_MAX_RATIO = 0.85f
+        private const val TELE_LENS_MIN_RATIO = 1.5f
     }
 
     private val config = activity.config
@@ -176,6 +189,9 @@ class CameraXPreview(
     private var currentRecording: Recording? = null
     private var recordingState: VideoRecordEvent? = null
     private var cameraSelector = config.lastUsedCameraLens.toCameraSelector()
+    private var backLenses: List<BackLens> = emptyList()
+    private var mainBackCameraId: String? = null
+    private var selectedLensId: String? = null
     private var flashMode = FLASH_MODE_OFF
     private var isPhotoCapture = initInPhotoMode
     private var lastRotation = 0
@@ -198,6 +214,7 @@ class CameraXPreview(
                 cameraProvider = provider
                 imageQualityManager.initSupportedQualities()
                 videoQualityManager.initSupportedQualities(provider)
+                updateBackLenses(provider)
                 bindCameraUseCases()
                 setupCameraObservers()
             } catch (e: Exception) {
@@ -233,6 +250,7 @@ class CameraXPreview(
         val previewUseCase = buildPreview(targetResolution, rotation)
         val captureUseCase = getCaptureUseCase(targetResolution, rotation)
 
+        val bindSelector = getBindSelector()
         cameraProvider.unbindAll()
         camera = if (isFullSize) {
             val metrics = windowMetricsCalculator.computeCurrentWindowMetrics(activity).bounds
@@ -248,13 +266,13 @@ class CameraXPreview(
 
             cameraProvider.bindToLifecycle(
                 activity,
-                cameraSelector,
+                bindSelector,
                 useCaseGroup,
             )
         } else {
             cameraProvider.bindToLifecycle(
                 activity,
-                cameraSelector,
+                bindSelector,
                 previewUseCase,
                 captureUseCase,
             )
@@ -340,6 +358,10 @@ class CameraXPreview(
     private fun setupCameraObservers() {
         listener.setFlashAvailable(camera?.cameraInfo?.hasFlashUnit() ?: false)
         listener.onChangeCamera(isFrontCameraInUse())
+        listener.onLensesChanged(
+            labels = if (isFrontCameraInUse()) emptyList() else backLenses.map { it.label },
+            selectedIndex = currentLensIndex()
+        )
         if (isPhotoCapture) {
             listener.onInitPhotoMode()
         } else {
@@ -518,6 +540,100 @@ class CameraXPreview(
             currentRecording?.stop()
             startCamera()
         }
+    }
+
+    private fun getBindSelector(): CameraSelector {
+        val lensId = selectedLensId
+        if (isFrontCameraInUse() || lensId == null || lensId == mainBackCameraId) {
+            return cameraSelector
+        }
+        return buildSelectorForCameraId(lensId)
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun buildSelectorForCameraId(cameraId: String): CameraSelector {
+        return CameraSelector.Builder()
+            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+            .addCameraFilter { cameraInfos ->
+                cameraInfos.filter { Camera2CameraInfo.from(it).cameraId == cameraId }
+            }
+            .build()
+    }
+
+    /**
+     * Finds the usable back lenses (main + ultra wide / telephoto) and labels them
+     * relative to the main lens, e.g. 0.5x, 1x. Macro and depth sensors are skipped
+     * because their focal length is close to the main lens.
+     */
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun updateBackLenses(provider: ProcessCameraProvider) {
+        backLenses = emptyList()
+        mainBackCameraId = null
+        try {
+            val allInfos = provider.availableCameraInfos
+            val backInfos = allInfos.filter { it.lensFacing == CameraSelector.LENS_FACING_BACK }
+            val mainInfo = CameraSelector.DEFAULT_BACK_CAMERA.filter(allInfos).firstOrNull()
+                ?: backInfos.firstOrNull()
+                ?: return
+            val mainId = Camera2CameraInfo.from(mainInfo).cameraId
+            val mainFocal = getEquivalentFocalLength(mainInfo) ?: return
+            mainBackCameraId = mainId
+
+            val lenses = backInfos.mapNotNull { info ->
+                val id = Camera2CameraInfo.from(info).cameraId
+                val ratio = (getEquivalentFocalLength(info) ?: return@mapNotNull null) / mainFocal
+                val include = id == mainId || ratio < WIDE_LENS_MAX_RATIO || ratio > TELE_LENS_MIN_RATIO
+                if (include) Triple(id, if (id == mainId) 1f else ratio, ratio) else null
+            }.sortedBy { it.second }
+
+            if (lenses.size < 2) {
+                return
+            }
+
+            backLenses = lenses.map { (id, displayRatio, _) -> BackLens(id, formatZoomLabel(displayRatio)) }
+            if (backLenses.none { it.cameraId == selectedLensId }) {
+                selectedLensId = mainId
+            }
+        } catch (e: Exception) {
+            backLenses = emptyList()
+            selectedLensId = null
+        }
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun getEquivalentFocalLength(info: CameraInfo): Float? {
+        val camera2Info = Camera2CameraInfo.from(info)
+        val focalLength = camera2Info
+            .getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+            ?.firstOrNull() ?: return null
+        val sensorSize = camera2Info
+            .getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return null
+        val diagonal = hypot(sensorSize.width, sensorSize.height)
+        if (diagonal <= 0f) {
+            return null
+        }
+        return focalLength * FULL_FRAME_DIAGONAL_MM / diagonal
+    }
+
+    private fun formatZoomLabel(ratio: Float): String {
+        val rounded = (ratio * 10).roundToInt() / 10f
+        return String.format(Locale.US, "%.1f", rounded).removeSuffix(".0") + "x"
+    }
+
+    private fun currentLensIndex(): Int {
+        val id = selectedLensId ?: mainBackCameraId
+        return backLenses.indexOfFirst { it.cameraId == id }.coerceAtLeast(0)
+    }
+
+    fun cycleBackLens() {
+        val isRecording = currentRecording != null && recordingState !is VideoRecordEvent.Finalize
+        if (isFrontCameraInUse() || backLenses.size < 2 || isRecording) {
+            return
+        }
+
+        val nextLens = backLenses[(currentLensIndex() + 1) % backLenses.size]
+        selectedLensId = nextLens.cameraId
+        startCamera(switching = true)
     }
 
     override fun toggleFrontBackCamera() {
@@ -749,3 +865,5 @@ class CameraXPreview(
         }
     }
 }
+
+private data class BackLens(val cameraId: String, val label: String)

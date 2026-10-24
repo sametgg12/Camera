@@ -11,6 +11,7 @@ interface CameraXPreviewListener {
     fun setHasFrontAndBackCamera(hasFrontAndBack: Boolean)
     fun setFlashAvailable(available: Boolean)
     fun onChangeCamera(frontCamera: Boolean) {}
+    fun onLensesChanged(labels: List<String>, selectedIndex: Int) {}
     fun shutterAnimation()
     fun onMediaSaved(uri: Uri)
     fun onImageCaptured(bitmap: Bitmap)
