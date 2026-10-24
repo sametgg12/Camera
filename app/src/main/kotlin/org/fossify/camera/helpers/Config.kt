@@ -118,4 +118,12 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getString("last_back_lens_id", "") ?: ""
         set(id) = prefs.edit().putString("last_back_lens_id", id).apply()
 
+    var gridMode: Int
+        get() = prefs.getInt("grid_mode", 0)
+        set(gridMode) = prefs.edit().putInt("grid_mode", gridMode).apply()
+
+    var swipeToSwitchCamera: Boolean
+        get() = prefs.getBoolean("swipe_to_switch_camera", false)
+        set(swipe) = prefs.edit().putBoolean("swipe_to_switch_camera", swipe).apply()
+
 }
