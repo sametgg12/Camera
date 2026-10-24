@@ -52,6 +52,11 @@
     <string name="save_photo_video_location">Save photo and video location</string>
     <string name="photo_compression_quality">Photo compression quality</string>
     <string name="shutter">Shutter</string>
+    <string name="video_format">Video format</string>
+    <string name="video_format_auto">Automatic (H.264)</string>
+    <string name="video_format_hevc">HEVC (H.265)</string>
+    <string name="hevc_not_supported">HEVC is not supported on this device, using automatic format</string>
+    <string name="remember_lens">Remember the last used lens</string>
     <string name="max_brightness">Max screen brightness in preview</string>
     <!--
         Haven't found some strings? There's more at
