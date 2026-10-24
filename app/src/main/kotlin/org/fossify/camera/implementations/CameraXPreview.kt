@@ -84,7 +84,6 @@ import org.fossify.camera.helpers.ImageUtil
 import org.fossify.camera.helpers.MediaOutputHelper
 import org.fossify.camera.helpers.MediaSizeStore
 import org.fossify.camera.helpers.MediaSoundHelper
-import org.fossify.camera.helpers.PinchToZoomOnScaleGestureListener
 import org.fossify.camera.helpers.SimpleLocationManager
 import org.fossify.camera.helpers.VideoQualityManager
 import org.fossify.camera.interfaces.MyPreview
@@ -122,6 +121,10 @@ class CameraXPreview(
         private const val FULL_FRAME_DIAGONAL_MM = 43.27f
         private const val WIDE_LENS_MAX_RATIO = 0.85f
         private const val TELE_LENS_MIN_RATIO = 1.5f
+
+        // How much the user has to pinch in at minimum zoom before we switch to a wider lens.
+        private const val LENS_SWITCH_PINCH_THRESHOLD = 0.9f
+        private const val ZOOM_EPSILON = 0.01f
     }
 
     private val config = activity.config
@@ -192,6 +195,7 @@ class CameraXPreview(
     private var backLenses: List<BackLens> = emptyList()
     private var mainBackCameraId: String? = null
     private var selectedLensId: String? = null
+    private var lensSwitchInProgress = false
     private var flashMode = FLASH_MODE_OFF
     private var isPhotoCapture = initInPhotoMode
     private var lastRotation = 0
@@ -218,6 +222,7 @@ class CameraXPreview(
                 bindCameraUseCases()
                 setupCameraObservers()
             } catch (e: Exception) {
+                lensSwitchInProgress = false
                 val errorMessage =
                     if (switching) R.string.camera_switch_error else R.string.camera_open_error
                 activity.toast(errorMessage)
@@ -356,12 +361,17 @@ class CameraXPreview(
     }
 
     private fun setupCameraObservers() {
+        lensSwitchInProgress = false
         listener.setFlashAvailable(camera?.cameraInfo?.hasFlashUnit() ?: false)
         listener.onChangeCamera(isFrontCameraInUse())
         listener.onLensesChanged(
             labels = if (isFrontCameraInUse()) emptyList() else backLenses.map { it.label },
             selectedIndex = currentLensIndex()
         )
+        camera?.cameraInfo?.zoomState?.observe(activity) { zoomState ->
+            val displayRatio = currentLensBaseRatio() * zoomState.zoomRatio
+            listener.onZoomLabelChanged(formatZoomLabel(displayRatio))
+        }
         if (isPhotoCapture) {
             listener.onInitPhotoMode()
         } else {
@@ -405,10 +415,7 @@ class CameraXPreview(
     // source: https://stackoverflow.com/a/60095886/10552591
     private fun setupZoomAndFocus() {
         val scaleGesture = camera?.let {
-            ScaleGestureDetector(
-                activity,
-                PinchToZoomOnScaleGestureListener(it.cameraInfo, it.cameraControl)
-            )
+            ScaleGestureDetector(activity, LensAwareZoomListener())
         }
         val gestureDetector = GestureDetector(activity, object : SimpleOnGestureListener() {
             override fun onDown(event: MotionEvent): Boolean {
@@ -590,7 +597,9 @@ class CameraXPreview(
                 return
             }
 
-            backLenses = lenses.map { (id, displayRatio, _) -> BackLens(id, formatZoomLabel(displayRatio)) }
+            backLenses = lenses.map { (id, displayRatio, _) ->
+                BackLens(id, formatZoomLabel(displayRatio), displayRatio)
+            }
             if (backLenses.none { it.cameraId == selectedLensId }) {
                 selectedLensId = mainId
             }
@@ -625,15 +634,82 @@ class CameraXPreview(
         return backLenses.indexOfFirst { it.cameraId == id }.coerceAtLeast(0)
     }
 
+    private fun isRecordingNow(): Boolean {
+        return currentRecording != null && recordingState !is VideoRecordEvent.Finalize
+    }
+
+    private fun canSwitchLens(): Boolean {
+        return !isFrontCameraInUse() && backLenses.size >= 2 && !isRecordingNow() && !lensSwitchInProgress
+    }
+
+    private fun currentLensBaseRatio(): Float {
+        return backLenses.getOrNull(currentLensIndex())?.ratio ?: 1f
+    }
+
+    private fun switchToLens(lens: BackLens) {
+        lensSwitchInProgress = true
+        selectedLensId = lens.cameraId
+        startCamera(switching = true)
+    }
+
     fun cycleBackLens() {
-        val isRecording = currentRecording != null && recordingState !is VideoRecordEvent.Finalize
-        if (isFrontCameraInUse() || backLenses.size < 2 || isRecording) {
+        if (!canSwitchLens()) {
             return
         }
+        switchToLens(backLenses[(currentLensIndex() + 1) % backLenses.size])
+    }
 
-        val nextLens = backLenses[(currentLensIndex() + 1) % backLenses.size]
-        selectedLensId = nextLens.cameraId
-        startCamera(switching = true)
+    /**
+     * Pinch to zoom that also moves between lenses: pinching in at minimum zoom switches to the
+     * next wider lens, and zooming in past the next lens' ratio switches to that lens.
+     */
+    private inner class LensAwareZoomListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        private var accumulatedScale = 1f
+
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            accumulatedScale = 1f
+            return true
+        }
+
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            val currentCamera = camera ?: return false
+            val zoomState = currentCamera.cameraInfo.zoomState.value ?: return false
+            if (lensSwitchInProgress) {
+                return true
+            }
+
+            val scale = detector.scaleFactor
+            val index = currentLensIndex()
+            val atMinZoom = zoomState.zoomRatio <= zoomState.minZoomRatio + ZOOM_EPSILON
+
+            if (canSwitchLens() && atMinZoom) {
+                if (scale < 1f) {
+                    accumulatedScale *= scale
+                    val widerLens = backLenses.getOrNull(index - 1)
+                    if (widerLens != null && accumulatedScale < LENS_SWITCH_PINCH_THRESHOLD) {
+                        accumulatedScale = 1f
+                        switchToLens(widerLens)
+                        return true
+                    }
+                } else {
+                    accumulatedScale = 1f
+                }
+            }
+
+            val newRatio = zoomState.zoomRatio * scale
+            if (canSwitchLens()) {
+                val nextLens = backLenses.getOrNull(index + 1)
+                if (nextLens != null && currentLensBaseRatio() * newRatio >= nextLens.ratio) {
+                    switchToLens(nextLens)
+                    return true
+                }
+            }
+
+            currentCamera.cameraControl.setZoomRatio(
+                newRatio.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
+            )
+            return true
+        }
     }
 
     override fun toggleFrontBackCamera() {
@@ -866,4 +942,4 @@ class CameraXPreview(
     }
 }
 
-private data class BackLens(val cameraId: String, val label: String)
+private data class BackLens(val cameraId: String, val label: String, val ratio: Float)
