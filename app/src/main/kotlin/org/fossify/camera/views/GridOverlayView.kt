@@ -21,6 +21,16 @@ class GridOverlayView @JvmOverloads constructor(
             invalidate()
         }
 
+    /**
+     * Width / height of the camera image shown inside this view (for example 0.75 for 4:3 in portrait).
+     * 0 means the image fills the whole view.
+     */
+    var contentAspect = 0f
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private val density = resources.displayMetrics.density
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -37,15 +47,31 @@ class GridOverlayView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val w = width.toFloat()
-        val h = height.toFloat()
+        var left = 0f
+        var top = 0f
+        var w = width.toFloat()
+        var h = height.toFloat()
+
+        if (contentAspect > 0f && w > 0f && h > 0f) {
+            val viewAspect = w / h
+            if (viewAspect > contentAspect) {
+                val contentWidth = h * contentAspect
+                left = (w - contentWidth) / 2f
+                w = contentWidth
+            } else {
+                val contentHeight = w / contentAspect
+                top = (h - contentHeight) / 2f
+                h = contentHeight
+            }
+        }
+
         for (i in 1 until divisions) {
-            val x = w * i / divisions
-            val y = h * i / divisions
-            canvas.drawLine(x, 0f, x, h, shadowPaint)
-            canvas.drawLine(0f, y, w, y, shadowPaint)
-            canvas.drawLine(x, 0f, x, h, linePaint)
-            canvas.drawLine(0f, y, w, y, linePaint)
+            val x = left + w * i / divisions
+            val y = top + h * i / divisions
+            canvas.drawLine(x, top, x, top + h, shadowPaint)
+            canvas.drawLine(left, y, left + w, y, shadowPaint)
+            canvas.drawLine(x, top, x, top + h, linePaint)
+            canvas.drawLine(left, y, left + w, y, linePaint)
         }
     }
 }

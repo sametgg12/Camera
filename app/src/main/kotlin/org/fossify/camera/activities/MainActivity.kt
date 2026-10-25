@@ -1011,36 +1011,23 @@ class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, Camera
         button.iconTint = ColorStateList(states, iconColors)
     }
 
+    override fun onPreviewContentAspect(aspect: Float) {
+        binding.gridOverlay.contentAspect = aspect
+    }
+
     override fun adjustPreviewView(requiresCentering: Boolean) {
         binding.apply {
             val constraintSet = ConstraintSet()
             constraintSet.clone(viewHolder)
-            if (requiresCentering) {
-                constraintSet.connect(
-                    previewView.id,
-                    ConstraintSet.TOP,
-                    topOptions.id,
-                    ConstraintSet.BOTTOM
-                )
-                constraintSet.connect(
-                    previewView.id,
-                    ConstraintSet.BOTTOM,
-                    cameraModeHolder.id,
-                    ConstraintSet.TOP
-                )
-            } else {
-                constraintSet.connect(
-                    previewView.id,
-                    ConstraintSet.TOP,
-                    ConstraintSet.PARENT_ID,
-                    ConstraintSet.TOP
-                )
-                constraintSet.connect(
-                    previewView.id,
-                    ConstraintSet.BOTTOM,
-                    ConstraintSet.PARENT_ID,
-                    ConstraintSet.BOTTOM
-                )
+            // The grid overlay always covers exactly the same area as the preview view.
+            listOf(previewView.id, gridOverlay.id).forEach { id ->
+                if (requiresCentering) {
+                    constraintSet.connect(id, ConstraintSet.TOP, topOptions.id, ConstraintSet.BOTTOM)
+                    constraintSet.connect(id, ConstraintSet.BOTTOM, cameraModeHolder.id, ConstraintSet.TOP)
+                } else {
+                    constraintSet.connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
+                    constraintSet.connect(id, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM)
+                }
             }
             constraintSet.applyTo(viewHolder)
         }

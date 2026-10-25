@@ -14,6 +14,7 @@ interface CameraXPreviewListener {
     fun onLensesChanged(labels: List<String>, selectedIndex: Int) {}
     fun onZoomLabelChanged(label: String) {}
     fun onQrCodeFound(text: String) {}
+    fun onPreviewContentAspect(aspect: Float) {}
     fun shutterAnimation()
     fun onMediaSaved(uri: Uri)
     fun onImageCaptured(bitmap: Bitmap)

@@ -274,6 +274,14 @@ class CameraXPreview(
 
         val isFullSize = resolution.isFullScreen
         previewView.scaleType = if (isFullSize) ScaleType.FILL_CENTER else ScaleType.FIT_CENTER
+        listener.onPreviewContentAspect(
+            if (isFullSize) {
+                0f
+            } else {
+                minOf(resolution.width, resolution.height).toFloat() /
+                    maxOf(resolution.width, resolution.height).toFloat()
+            }
+        )
         val rotation = previewView.display.rotation
         val targetResolution = Size(resolution.width, resolution.height)
 
