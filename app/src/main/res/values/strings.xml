@@ -62,6 +62,15 @@
     <string name="grid_3x3">3 x 3</string>
     <string name="grid_4x4">4 x 4</string>
     <string name="swipe_to_switch_camera">Swipe up or down to switch front/back camera</string>
+    <string name="photo_format">Photo format</string>
+    <string name="photo_format_jpeg">JPEG</string>
+    <string name="photo_format_heic">HEIC</string>
+    <string name="heic_quality">HEIC quality</string>
+    <string name="start_with_max_four_three">Start with 4:3 and the highest resolution</string>
+    <string name="qr_scan">Scan QR codes</string>
+    <string name="qr_open">Open</string>
+    <string name="qr_copy">Copy</string>
+    <string name="qr_copied">Copied</string>
     <string name="max_brightness">Max screen brightness in preview</string>
     <!--
         Haven't found some strings? There's more at

@@ -16,6 +16,10 @@ class ImageQualityManager(private val activity: AppCompatActivity) {
     companion object {
         private val CAMERA_LENS =
             arrayOf(CameraCharacteristics.LENS_FACING_FRONT, CameraCharacteristics.LENS_FACING_BACK)
+
+        // Cameras (front = true / back = false) that already got the "4:3 + highest resolution"
+        // startup selection during this app launch.
+        private val startupSelectionApplied = mutableSetOf<Boolean>()
     }
 
     private val cameraManager = activity.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -62,6 +66,18 @@ class ImageQualityManager(private val activity: AppCompatActivity) {
     fun getUserSelectedResolution(cameraSelector: CameraSelector): MySize {
         val resolutions = getSupportedResolutions(cameraSelector)
         val isFrontCamera = cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA
+        if (activity.config.startWithMaxFourThree && startupSelectionApplied.add(isFrontCamera)) {
+            val fourThreeIndex = resolutions.indexOfFirst {
+                !it.isFullScreen && it.getAspectRatio(activity) == "4:3"
+            }
+            if (fourThreeIndex >= 0) {
+                mediaSizeStore.storeSize(
+                    isPhotoCapture = true,
+                    isFrontCamera = isFrontCamera,
+                    currentIndex = fourThreeIndex
+                )
+            }
+        }
         var index = mediaSizeStore.getCurrentSizeIndex(
             isPhotoCapture = true, isFrontCamera = isFrontCamera
         )

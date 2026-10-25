@@ -55,5 +55,14 @@
     <string name="grid_3x3">3 x 3</string>
     <string name="grid_4x4">4 x 4</string>
     <string name="swipe_to_switch_camera">Ön/arka kamerayı yukarı veya aşağı kaydırarak değiştir</string>
+    <string name="photo_format">Fotoğraf biçimi</string>
+    <string name="photo_format_jpeg">JPEG</string>
+    <string name="photo_format_heic">HEIC</string>
+    <string name="heic_quality">HEIC kalitesi</string>
+    <string name="start_with_max_four_three">4:3 ve en yüksek çözünürlükle başla</string>
+    <string name="qr_scan">QR kodları tara</string>
+    <string name="qr_open">Aç</string>
+    <string name="qr_copy">Kopyala</string>
+    <string name="qr_copied">Kopyalandı</string>
     <string name="max_brightness">Önizlemede en yüksek ekran parlaklığı</string>
 </resources>

@@ -51,6 +51,10 @@ class SettingsActivity : SimpleActivity() {
         setupVideoFormat()
         setupRememberLens()
         setupGridLines()
+        setupPhotoFormat()
+        setupHeicQuality()
+        setupStartMax()
+        setupQr()
         setupSwipeCamera()
         updateTextColors(binding.settingsHolder)
 
@@ -349,6 +353,64 @@ class SettingsActivity : SimpleActivity() {
         settingsSwipeCameraHolder.setOnClickListener {
             settingsSwipeCamera.toggle()
             config.swipeToSwitchCamera = settingsSwipeCamera.isChecked
+        }
+    }
+
+    private fun setupPhotoFormat() {
+        updatePhotoFormat(config.photoFormat)
+        binding.settingsPhotoFormatHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(Config.PHOTO_FORMAT_JPEG, getString(R.string.photo_format_jpeg)),
+                RadioItem(Config.PHOTO_FORMAT_HEIC, getString(R.string.photo_format_heic))
+            )
+
+            RadioGroupDialog(this@SettingsActivity, items, config.photoFormat) {
+                config.photoFormat = it as Int
+                updatePhotoFormat(it)
+            }
+        }
+    }
+
+    private fun updatePhotoFormat(format: Int) {
+        binding.settingsPhotoFormat.text = getString(
+            if (format == Config.PHOTO_FORMAT_HEIC) R.string.photo_format_heic else R.string.photo_format_jpeg
+        )
+    }
+
+    private fun setupHeicQuality() {
+        updateHeicQuality(config.heicQuality)
+        binding.settingsHeicQualityHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(100, "100%"),
+                RadioItem(90, "90%"),
+                RadioItem(80, "80%")
+            )
+
+            RadioGroupDialog(this@SettingsActivity, items, config.heicQuality) {
+                config.heicQuality = it as Int
+                updateHeicQuality(it)
+            }
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun updateHeicQuality(quality: Int) {
+        binding.settingsHeicQuality.text = "$quality%"
+    }
+
+    private fun setupStartMax() = binding.apply {
+        settingsStartMax.isChecked = config.startWithMaxFourThree
+        settingsStartMaxHolder.setOnClickListener {
+            settingsStartMax.toggle()
+            config.startWithMaxFourThree = settingsStartMax.isChecked
+        }
+    }
+
+    private fun setupQr() = binding.apply {
+        settingsQr.isChecked = config.qrScanEnabled
+        settingsQrHolder.setOnClickListener {
+            settingsQr.toggle()
+            config.qrScanEnabled = settingsQr.isChecked
         }
     }
 }

@@ -198,6 +198,36 @@
                 </RelativeLayout>
 
                 <RelativeLayout
+                    android:id="@+id/settings_start_max_holder"
+                    style="@style/SettingsHolderCheckboxStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <org.fossify.commons.views.MyMaterialSwitch
+                        android:id="@+id/settings_start_max"
+                        style="@style/SettingsSwitchStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/start_with_max_four_three" />
+
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/settings_qr_holder"
+                    style="@style/SettingsHolderCheckboxStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <org.fossify.commons.views.MyMaterialSwitch
+                        android:id="@+id/settings_qr"
+                        style="@style/SettingsSwitchStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/qr_scan" />
+
+                </RelativeLayout>
+
+                <RelativeLayout
                     android:id="@+id/settings_grid_holder"
                     style="@style/SettingsHolderTextViewStyle"
                     android:layout_width="match_parent"
@@ -364,6 +394,52 @@
                         android:layout_height="wrap_content"
                         android:layout_below="@+id/settings_capture_mode_label"
                         tools:text="@string/minimize_latency" />
+
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/settings_photo_format_holder"
+                    style="@style/SettingsHolderTextViewStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/settings_photo_format_label"
+                        style="@style/SettingsTextLabelStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/photo_format" />
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/settings_photo_format"
+                        style="@style/SettingsTextValueStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@+id/settings_photo_format_label"
+                        tools:text="@string/photo_format_jpeg" />
+
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/settings_heic_quality_holder"
+                    style="@style/SettingsHolderTextViewStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/settings_heic_quality_label"
+                        style="@style/SettingsTextLabelStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/heic_quality" />
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/settings_heic_quality"
+                        style="@style/SettingsTextValueStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@+id/settings_heic_quality_label"
+                        tools:text="100%" />
 
                 </RelativeLayout>
 

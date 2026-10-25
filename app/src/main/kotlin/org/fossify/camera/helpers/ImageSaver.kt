@@ -32,9 +32,12 @@ class ImageSaver private constructor(
     private val metadata: Metadata,
     private val jpegQuality: Int,
     private val saveExifAttributes: Boolean,
+    private val heicQuality: Int?,
     private val onImageSaved: (Uri) -> Unit,
     private val onError: (ImageCaptureException) -> Unit,
 ) {
+
+    private var isHeic = false
 
     companion object {
         private const val TEMP_FILE_PREFIX = "SimpleCamera"
@@ -50,6 +53,7 @@ class ImageSaver private constructor(
             metadata: Metadata,
             jpegQuality: Int,
             saveExifAttributes: Boolean,
+            heicQuality: Int? = null,
             onImageSaved: (Uri) -> Unit,
             onError: (ImageCaptureException) -> Unit,
         ) = ImageSaver(
@@ -59,6 +63,7 @@ class ImageSaver private constructor(
             metadata = metadata,
             jpegQuality = jpegQuality,
             saveExifAttributes = saveExifAttributes,
+            heicQuality = heicQuality,
             onImageSaved = onImageSaved,
             onError = onError,
         ).saveImage()
@@ -70,7 +75,19 @@ class ImageSaver private constructor(
             // supports saving to File.
             val tempFile = saveImageToTempFile()
             if (tempFile != null) {
-                copyTempFileToDestination(tempFile)
+                val heicFile = if (heicQuality != null && mediaOutput is MediaOutput.MediaStoreOutput) {
+                    HeicConverter.convert(tempFile, heicQuality)
+                } else {
+                    null
+                }
+
+                if (heicFile != null) {
+                    tempFile.delete()
+                    isHeic = true
+                    copyTempFileToDestination(heicFile)
+                } else {
+                    copyTempFileToDestination(tempFile)
+                }
             }
         }
     }
@@ -179,6 +196,14 @@ class ImageSaver private constructor(
             when (mediaOutput) {
                 is MediaOutput.MediaStoreOutput -> {
                     val values = mediaOutput.contentValues
+                    if (isHeic) {
+                        val name = values.getAsString(MediaStore.MediaColumns.DISPLAY_NAME).orEmpty()
+                        values.put(
+                            MediaStore.MediaColumns.DISPLAY_NAME,
+                            name.substringBeforeLast('.', name) + ".heic"
+                        )
+                        values.put(MediaStore.MediaColumns.MIME_TYPE, "image/heic")
+                    }
                     setContentValuePending(values, PENDING)
                     outputUri = contentResolver.insert(
                         mediaOutput.contentUri, values

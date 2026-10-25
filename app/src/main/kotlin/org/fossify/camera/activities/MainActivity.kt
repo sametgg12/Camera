@@ -48,6 +48,7 @@ import kotlin.math.abs
 class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, CameraXPreviewListener {
     private companion object {
         private const val ANIMATION_DURATION = 500L
+        private const val QR_IGNORE_MS = 5000L
         private const val PHOTO_MODE_INDEX = 1
         private const val VIDEO_MODE_INDEX = 0
         private const val MIN_SWIPE_DISTANCE_X = 100
@@ -394,6 +395,10 @@ class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, Camera
             (mPreview as? CameraXPreview)?.cycleBackLens()
         }
 
+        qrOpen.setOnClickListener { openQrLink() }
+        qrCopy.setOnClickListener { copyQrText() }
+        qrClose.setOnClickListener { dismissQrBanner() }
+
         lastPhotoVideoPreview.setOnClickListener { showLastMediaPreview() }
 
         layoutTop.apply {
@@ -442,6 +447,47 @@ class MainActivity : SimpleActivity(), PhotoProcessor.MediaSavedListener, Camera
         }
 
         setTimerModeIcon(config.timerMode)
+    }
+
+    private var qrCurrentText: String? = null
+    private var qrIgnoredText: String? = null
+    private var qrIgnoreUntil = 0L
+
+    override fun onQrCodeFound(text: String) {
+        if (text == qrCurrentText && binding.qrBanner.isVisible()) {
+            return
+        }
+        if (text == qrIgnoredText && android.os.SystemClock.elapsedRealtime() < qrIgnoreUntil) {
+            return
+        }
+        qrCurrentText = text
+        binding.apply {
+            qrText.text = text
+            qrOpen.beVisibleIf(text.startsWith("http://") || text.startsWith("https://"))
+            qrBanner.beVisible()
+        }
+    }
+
+    private fun dismissQrBanner() {
+        qrIgnoredText = qrCurrentText
+        qrIgnoreUntil = android.os.SystemClock.elapsedRealtime() + QR_IGNORE_MS
+        binding.qrBanner.beGone()
+    }
+
+    private fun openQrLink() {
+        val text = qrCurrentText ?: return
+        try {
+            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(text)))
+        } catch (e: Exception) {
+            showErrorToast(e)
+        }
+    }
+
+    private fun copyQrText() {
+        val text = qrCurrentText ?: return
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("QR", text))
+        toast(R.string.qr_copied)
     }
 
     private fun animateCameraToggle() {

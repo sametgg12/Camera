@@ -171,6 +171,8 @@ dependencies {
     implementation(libs.fossify.commons)
     implementation(libs.bundles.androidx.camera)
     implementation(libs.androidx.documentfile)
+    implementation(libs.androidx.heifwriter)
+    implementation(libs.zxing.cpp)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.window)

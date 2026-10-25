@@ -14,6 +14,8 @@ class Config(context: Context) : BaseConfig(context) {
 
         const val VIDEO_FORMAT_AUTO = 0
         const val VIDEO_FORMAT_HEVC = 1
+        const val PHOTO_FORMAT_JPEG = 0
+        const val PHOTO_FORMAT_HEIC = 1
     }
 
     var savePhotosFolder: String
@@ -125,5 +127,21 @@ class Config(context: Context) : BaseConfig(context) {
     var swipeToSwitchCamera: Boolean
         get() = prefs.getBoolean("swipe_to_switch_camera", false)
         set(swipe) = prefs.edit().putBoolean("swipe_to_switch_camera", swipe).apply()
+
+    var photoFormat: Int
+        get() = prefs.getInt("photo_format", PHOTO_FORMAT_JPEG)
+        set(photoFormat) = prefs.edit().putInt("photo_format", photoFormat).apply()
+
+    var heicQuality: Int
+        get() = prefs.getInt("heic_quality", 100)
+        set(heicQuality) = prefs.edit().putInt("heic_quality", heicQuality).apply()
+
+    var startWithMaxFourThree: Boolean
+        get() = prefs.getBoolean("start_with_max_four_three", true)
+        set(value) = prefs.edit().putBoolean("start_with_max_four_three", value).apply()
+
+    var qrScanEnabled: Boolean
+        get() = prefs.getBoolean("qr_scan_enabled", false)
+        set(value) = prefs.edit().putBoolean("qr_scan_enabled", value).apply()
 
 }

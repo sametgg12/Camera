@@ -50,6 +50,12 @@ class MediaOutputHelper(
     private var config = activity.config
     private val contentResolver = activity.contentResolver
 
+    fun isHeicEnabled(): Boolean {
+        return config.photoFormat == Config.PHOTO_FORMAT_HEIC &&
+            !is3rdPartyIntent &&
+            HeicConverter.isSupported()
+    }
+
     fun getImageMediaOutput(): MediaOutput.ImageCaptureOutput {
         return try {
             if (is3rdPartyIntent) {
@@ -65,7 +71,12 @@ class MediaOutputHelper(
                     MediaOutput.BitmapOutput
                 }
             } else {
-                getOutputStreamMediaOutput() ?: getMediaStoreOutput(isPhoto = true)
+                if (isHeicEnabled()) {
+                    // HEIC is always written through MediaStore, the file name is set when saving.
+                    getMediaStoreOutput(isPhoto = true)
+                } else {
+                    getOutputStreamMediaOutput() ?: getMediaStoreOutput(isPhoto = true)
+                }
             }
         } catch (e: Exception) {
             errorHandler.showSaveToInternalStorage()
@@ -127,7 +138,7 @@ class MediaOutputHelper(
             put(MediaStore.MediaColumns.DISPLAY_NAME, getRandomMediaName(isPhoto))
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
             if (isQPlus()) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DCIM)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, getRelativePath(isPhoto))
             } else {
                 put(
                     MediaStore.MediaColumns.DATA,
@@ -136,6 +147,20 @@ class MediaOutputHelper(
                 )
             }
         }
+    }
+
+    private fun getRelativePath(isPhoto: Boolean): String {
+        if (!isPhoto || config.photoFormat != Config.PHOTO_FORMAT_HEIC) {
+            return Environment.DIRECTORY_DCIM
+        }
+        val root = Environment.getExternalStorageDirectory().absolutePath
+        val folder = config.savePhotosFolder
+        val relative = if (folder.startsWith("$root/")) folder.removePrefix("$root/") else ""
+        val allowed = relative == Environment.DIRECTORY_DCIM ||
+            relative.startsWith(Environment.DIRECTORY_DCIM + "/") ||
+            relative == Environment.DIRECTORY_PICTURES ||
+            relative.startsWith(Environment.DIRECTORY_PICTURES + "/")
+        return if (allowed) relative else Environment.DIRECTORY_DCIM
     }
 
     private fun getOutputStreamMediaOutput(): MediaOutput.OutputStreamMediaOutput? {

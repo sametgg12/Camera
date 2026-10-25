@@ -7,6 +7,7 @@ import android.hardware.SensorManager
 import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Rational
 import android.util.Size
 import android.view.Display
@@ -25,6 +26,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
 import androidx.camera.core.DisplayOrientedMeteringPointFactory
 import androidx.camera.core.FocusMeteringAction
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCapture.Builder
 import androidx.camera.core.ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
@@ -97,6 +99,9 @@ import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.PERMISSION_ACCESS_FINE_LOCATION
 import org.fossify.commons.helpers.ensureBackgroundThread
 import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import zxingcpp.BarcodeReader
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.roundToInt
@@ -129,6 +134,10 @@ class CameraXPreview(
         private const val MIME_HEVC = "video/hevc"
         private const val SWIPE_MIN_DISTANCE_DP = 120f
         private const val SWIPE_MIN_VELOCITY = 800f
+        private const val QR_SCAN_INTERVAL_MS = 300L
+        private const val QR_ANALYSIS_WIDTH = 1280
+        private const val QR_ANALYSIS_HEIGHT = 720
+        private const val PHOTO_JPEG_QUALITY_FOR_HEIC = 100
     }
 
     private val config = activity.config
@@ -193,6 +202,9 @@ class CameraXPreview(
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var hevcUnsupported = false
+    private var qrExecutor: ExecutorService? = null
+    private var qrReader: BarcodeReader? = null
+    private var lastQrScanTime = 0L
     private var camera: Camera? = null
     private var currentRecording: Recording? = null
     private var recordingState: VideoRecordEvent? = null
@@ -267,6 +279,7 @@ class CameraXPreview(
 
         val previewUseCase = buildPreview(targetResolution, rotation)
         val captureUseCase = getCaptureUseCase(targetResolution, rotation)
+        val analysisUseCase = if (isPhotoCapture && config.qrScanEnabled) buildQrAnalysis() else null
 
         val bindSelector = getBindSelector()
         cameraProvider.unbindAll()
@@ -279,6 +292,7 @@ class CameraXPreview(
             val useCaseGroup = UseCaseGroup.Builder()
                 .addUseCase(previewUseCase)
                 .addUseCase(captureUseCase)
+                .apply { analysisUseCase?.let { addUseCase(it) } }
                 .setViewPort(viewPort)
                 .build()
 
@@ -288,16 +302,53 @@ class CameraXPreview(
                 useCaseGroup,
             )
         } else {
+            val useCases = listOfNotNull(previewUseCase, captureUseCase, analysisUseCase)
             cameraProvider.bindToLifecycle(
                 activity,
                 bindSelector,
-                previewUseCase,
-                captureUseCase,
+                *useCases.toTypedArray(),
             )
         }
         preview = previewUseCase
         setupZoomAndFocus()
         setFlashlightState(config.flashlightState)
+    }
+
+    private fun buildQrAnalysis(): ImageAnalysis {
+        val executor = qrExecutor ?: Executors.newSingleThreadExecutor().also { qrExecutor = it }
+        val reader = qrReader ?: BarcodeReader().also { qrReader = it }
+        val resolutionSelector = ResolutionSelector.Builder()
+            .setResolutionStrategy(
+                ResolutionStrategy(
+                    Size(QR_ANALYSIS_WIDTH, QR_ANALYSIS_HEIGHT),
+                    FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
+                )
+            )
+            .build()
+
+        return ImageAnalysis.Builder()
+            .setResolutionSelector(resolutionSelector)
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build().also { analysis ->
+                analysis.setAnalyzer(executor) { frame ->
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastQrScanTime < QR_SCAN_INTERVAL_MS) {
+                        frame.close()
+                        return@setAnalyzer
+                    }
+                    lastQrScanTime = now
+                    try {
+                        val text = frame.use { reader.read(it) }
+                            .firstOrNull { it.format.toString().contains("QR", ignoreCase = true) }
+                            ?.text
+                        if (!text.isNullOrEmpty()) {
+                            mainExecutor.execute { listener.onQrCodeFound(text) }
+                        }
+                    } catch (e: Exception) {
+                        // Ignore frames that cannot be decoded.
+                    }
+                }
+            }
     }
 
     private fun buildPreview(resolution: Size, rotation: Int): Preview {
@@ -327,7 +378,7 @@ class CameraXPreview(
         return Builder()
             .setCaptureMode(getCaptureMode())
             .setFlashMode(flashMode)
-            .setJpegQuality(config.photoQuality)
+            .setJpegQuality(if (mediaOutputHelper.isHeicEnabled()) PHOTO_JPEG_QUALITY_FOR_HEIC else config.photoQuality)
             .setTargetRotation(rotation)
             .setResolutionSelector(getResolutionSelector(resolution))
             .build()
@@ -707,8 +758,16 @@ class CameraXPreview(
     private inner class LensAwareZoomListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         private var accumulatedScale = 1f
 
+        // The zoom ratio we asked the camera for. CameraX reports the real value asynchronously,
+        // so reading it on every pinch event made the zoom lag behind the fingers.
+        private var targetZoom = 1f
+        private var trackedCamera: Camera? = null
+
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
             accumulatedScale = 1f
+            val currentCamera = camera
+            trackedCamera = currentCamera
+            targetZoom = currentCamera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1f
             return true
         }
 
@@ -719,9 +778,16 @@ class CameraXPreview(
                 return true
             }
 
+            if (trackedCamera !== currentCamera) {
+                trackedCamera = currentCamera
+                targetZoom = zoomState.zoomRatio
+            }
+
             val scale = detector.scaleFactor
             val index = currentLensIndex()
-            val atMinZoom = zoomState.zoomRatio <= zoomState.minZoomRatio + ZOOM_EPSILON
+            val minZoom = zoomState.minZoomRatio
+            val maxZoom = zoomState.maxZoomRatio
+            val atMinZoom = targetZoom <= minZoom + ZOOM_EPSILON
 
             if (canSwitchLens() && atMinZoom) {
                 if (scale < 1f) {
@@ -737,18 +803,17 @@ class CameraXPreview(
                 }
             }
 
-            val newRatio = zoomState.zoomRatio * scale
+            val rawRatio = targetZoom * scale
             if (canSwitchLens()) {
                 val nextLens = backLenses.getOrNull(index + 1)
-                if (nextLens != null && currentLensBaseRatio() * newRatio >= nextLens.ratio) {
+                if (nextLens != null && currentLensBaseRatio() * rawRatio >= nextLens.ratio) {
                     switchToLens(nextLens)
                     return true
                 }
             }
 
-            currentCamera.cameraControl.setZoomRatio(
-                newRatio.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
-            )
+            targetZoom = rawRatio.coerceIn(minZoom, maxZoom)
+            currentCamera.cameraControl.setZoomRatio(targetZoom)
             return true
         }
     }
@@ -824,6 +889,7 @@ class CameraXPreview(
         }
 
         val mediaOutput = mediaOutputHelper.getImageMediaOutput()
+        val heicQuality = if (mediaOutputHelper.isHeicEnabled()) config.heicQuality else null
         imageCapture!!.takePicture(mainExecutor, object : OnImageCapturedCallback() {
             override fun onCaptureSuccess(image: ImageProxy) {
                 listener.shutterAnimation()
@@ -847,8 +913,9 @@ class CameraXPreview(
                                 image = image,
                                 mediaOutput = mediaOutput,
                                 metadata = metadata,
-                                jpegQuality = config.photoQuality,
+                                jpegQuality = if (heicQuality != null) PHOTO_JPEG_QUALITY_FOR_HEIC else config.photoQuality,
                                 saveExifAttributes = config.savePhotoMetadata,
+                                heicQuality = heicQuality,
                                 onImageSaved = { savedUri ->
                                     activity.runOnUiThread {
                                         listener.onPhotoCaptureEnd()
